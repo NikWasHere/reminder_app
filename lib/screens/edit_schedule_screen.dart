@@ -1,24 +1,28 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:drift/drift.dart' as drift;
 import '../data/database.dart';
 import '../services/notification_service.dart';
 
-class AddScheduleScreen extends StatefulWidget {
-  const AddScheduleScreen({super.key});
+class EditScheduleScreen extends StatefulWidget {
+  final int scheduleId;
+
+  const EditScheduleScreen({super.key, required this.scheduleId});
 
   @override
-  State<AddScheduleScreen> createState() => _AddScheduleScreenState();
+  State<EditScheduleScreen> createState() => _EditScheduleScreenState();
 }
 
-class _AddScheduleScreenState extends State<AddScheduleScreen> {
+class _EditScheduleScreenState extends State<EditScheduleScreen> {
   final _formKey = GlobalKey<FormState>();
   final _courseNameController = TextEditingController();
   final _lecturerController = TextEditingController();
   final _roomController = TextEditingController();
+
   String _selectedDay = 'Monday';
   TimeOfDay _startTime = const TimeOfDay(hour: 8, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 9, minute: 30);
+  bool _isLoading = true;
+  Schedule? _schedule;
 
   final List<String> _days = [
     'Monday',
@@ -32,6 +36,47 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
 
   final AppDatabase _database = AppDatabase();
   final NotificationService _notificationService = NotificationService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSchedule();
+  }
+
+  @override
+  void dispose() {
+    _courseNameController.dispose();
+    _lecturerController.dispose();
+    _roomController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadSchedule() async {
+    final schedule = await _database.getScheduleById(widget.scheduleId);
+    if (schedule != null) {
+      setState(() {
+        _schedule = schedule;
+        _courseNameController.text = schedule.courseName;
+        _lecturerController.text = schedule.lecturer;
+        _roomController.text = schedule.room;
+        _selectedDay = schedule.day;
+
+        final startTimeParts = schedule.startTime.split(':');
+        _startTime = TimeOfDay(
+          hour: int.parse(startTimeParts[0]),
+          minute: int.parse(startTimeParts[1]),
+        );
+
+        final endTimeParts = schedule.endTime.split(':');
+        _endTime = TimeOfDay(
+          hour: int.parse(endTimeParts[0]),
+          minute: int.parse(endTimeParts[1]),
+        );
+
+        _isLoading = false;
+      });
+    }
+  }
 
   Future<void> _selectTime(BuildContext context, bool isStartTime) async {
     final TimeOfDay? picked = await showTimePicker(
@@ -55,22 +100,23 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
     return '$hour:$minute';
   }
 
-  void _saveSchedule() async {
-    if (_formKey.currentState!.validate()) {
-      final schedule = SchedulesCompanion(
-        courseName: drift.Value(_courseNameController.text),
-        lecturer: drift.Value(_lecturerController.text),
-        room: drift.Value(_roomController.text),
-        day: drift.Value(_selectedDay),
-        startTime: drift.Value(_formatTimeOfDay(_startTime)),
-        endTime: drift.Value(_formatTimeOfDay(_endTime)),
+  Future<void> _updateSchedule() async {
+    if (_formKey.currentState!.validate() && _schedule != null) {
+      final updatedSchedule = _schedule!.copyWith(
+        courseName: _courseNameController.text,
+        lecturer: _lecturerController.text,
+        room: _roomController.text,
+        day: _selectedDay,
+        startTime: _formatTimeOfDay(_startTime),
+        endTime: _formatTimeOfDay(_endTime),
       );
 
-      final scheduleId = await _database.insertSchedule(schedule);
+      await _database.updateSchedule(updatedSchedule);
 
-      // Schedule notification
+      // Cancel old notification and schedule new one
+      await _notificationService.cancelClassReminder(widget.scheduleId);
       await _notificationService.scheduleClassReminder(
-        id: scheduleId,
+        id: widget.scheduleId,
         courseName: _courseNameController.text,
         lecturer: _lecturerController.text,
         room: _roomController.text,
@@ -80,7 +126,7 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Schedule added successfully')),
+          const SnackBar(content: Text('Schedule updated successfully')),
         );
         context.pop();
       }
@@ -88,17 +134,20 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
   }
 
   @override
-  void dispose() {
-    _courseNameController.dispose();
-    _lecturerController.dispose();
-    _roomController.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    if (_isLoading) {
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+    }
+
+    if (_schedule == null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Schedule Not Found')),
+        body: const Center(child: Text('Schedule not found')),
+      );
+    }
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Add Class Schedule')),
+      appBar: AppBar(title: const Text('Edit Class Schedule')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Form(
@@ -187,11 +236,11 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
               ),
               const SizedBox(height: 24),
               ElevatedButton(
-                onPressed: _saveSchedule,
+                onPressed: _updateSchedule,
                 style: ElevatedButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: const Text('Save Schedule'),
+                child: const Text('Update Schedule'),
               ),
             ],
           ),

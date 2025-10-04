@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../database/database_helper.dart';
-import '../models/schedule.dart';
+import 'package:go_router/go_router.dart';
+import '../data/database.dart';
+import '../services/notification_service.dart';
 
 class ScheduleListScreen extends StatefulWidget {
   const ScheduleListScreen({super.key});
@@ -10,16 +11,17 @@ class ScheduleListScreen extends StatefulWidget {
 }
 
 class _ScheduleListScreenState extends State<ScheduleListScreen> {
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
-  String _selectedDay = 'Senin';
+  final AppDatabase _database = AppDatabase();
+  final NotificationService _notificationService = NotificationService();
+  String _selectedDay = 'Monday';
   final List<String> _days = [
-    'Senin',
-    'Selasa',
-    'Rabu',
-    'Kamis',
-    'Jumat',
-    'Sabtu',
-    'Minggu',
+    'Monday',
+    'Tuesday',
+    'Wednesday',
+    'Thursday',
+    'Friday',
+    'Saturday',
+    'Sunday',
   ];
 
   @override
@@ -44,8 +46,8 @@ class _ScheduleListScreenState extends State<ScheduleListScreen> {
           ),
         ),
         Expanded(
-          child: FutureBuilder<List<Map<String, dynamic>>>(
-            future: _databaseHelper.getSchedulesByDay(_selectedDay),
+          child: StreamBuilder<List<Schedule>>(
+            stream: _database.watchSchedulesByDay(_selectedDay),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
@@ -53,22 +55,22 @@ class _ScheduleListScreenState extends State<ScheduleListScreen> {
 
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return Center(
-                  child: Text(
-                    'Tidak ada kelas yang dijadwalkan untuk hari $_selectedDay',
-                  ),
+                  child: Text('No classes scheduled for $_selectedDay'),
                 );
               }
 
+              final schedules = snapshot.data!;
               return ListView.builder(
-                itemCount: snapshot.data!.length,
+                itemCount: schedules.length,
                 itemBuilder: (context, index) {
-                  final schedule = Schedule.fromMap(snapshot.data![index]);
+                  final schedule = schedules[index];
                   return Card(
                     margin: const EdgeInsets.symmetric(
                       horizontal: 8.0,
                       vertical: 4.0,
                     ),
                     child: ListTile(
+                      leading: const Icon(Icons.schedule, color: Colors.blue),
                       title: Text(schedule.courseName),
                       subtitle: Text(
                         '${schedule.lecturer}\n${schedule.room}\n${schedule.startTime} - ${schedule.endTime}',
@@ -80,41 +82,14 @@ class _ScheduleListScreenState extends State<ScheduleListScreen> {
                           IconButton(
                             icon: const Icon(Icons.edit),
                             onPressed: () {
-                              // TODO: Implement edit functionality
+                              context.push(
+                                '/home/edit-schedule/${schedule.id}',
+                              );
                             },
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete),
-                            onPressed: () async {
-                              final confirmed = await showDialog<bool>(
-                                context: context,
-                                builder: (context) => AlertDialog(
-                                  title: const Text('Hapus Jadwal'),
-                                  content: const Text(
-                                    'Apakah Anda yakin ingin menghapus jadwal ini?',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(false),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    TextButton(
-                                      onPressed: () =>
-                                          Navigator.of(context).pop(true),
-                                      child: const Text('Delete'),
-                                    ),
-                                  ],
-                                ),
-                              );
-
-                              if (confirmed == true && schedule.id != null) {
-                                await _databaseHelper.deleteSchedule(
-                                  schedule.id!,
-                                );
-                                setState(() {});
-                              }
-                            },
+                            onPressed: () => _deleteSchedule(schedule),
                           ),
                         ],
                       ),
@@ -127,5 +102,32 @@ class _ScheduleListScreenState extends State<ScheduleListScreen> {
         ),
       ],
     );
+  }
+
+  Future<void> _deleteSchedule(Schedule schedule) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Schedule'),
+        content: Text(
+          'Are you sure you want to delete "${schedule.courseName}"?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await _notificationService.cancelClassReminder(schedule.id);
+      await _database.deleteSchedule(schedule.id);
+    }
   }
 }

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import '../database/database_helper.dart';
-import '../models/user.dart';
-import 'home_screen.dart';
+import 'package:go_router/go_router.dart';
+import 'package:drift/drift.dart' as drift;
+import '../data/database.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -16,7 +16,7 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final AppDatabase _database = AppDatabase();
 
   @override
   void dispose() {
@@ -28,18 +28,18 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
 
   void _register() async {
     if (_formKey.currentState!.validate()) {
-      final user = User(
-        name: _nameController.text,
-        email: _emailController.text.isEmpty ? null : _emailController.text,
-        password: _passwordController.text,
+      final user = UsersCompanion(
+        name: drift.Value(_nameController.text),
+        email: drift.Value(
+          _emailController.text.isEmpty ? null : _emailController.text,
+        ),
+        password: drift.Value(_passwordController.text),
       );
 
-      await _databaseHelper.insertUser(user.toMap());
+      await _database.insertUser(user);
 
       if (mounted) {
-        Navigator.of(context).pushReplacement(
-          MaterialPageRoute(builder: (context) => const HomeScreen()),
-        );
+        context.go('/home');
       }
     }
   }

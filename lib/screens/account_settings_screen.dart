@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
-import '../database/database_helper.dart';
-import '../models/user.dart';
-import 'registration_screen.dart';
+import 'package:go_router/go_router.dart';
+import '../data/database.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
   final User user;
@@ -18,7 +17,7 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   late TextEditingController _emailController;
   late TextEditingController _passwordController;
 
-  final DatabaseHelper _databaseHelper = DatabaseHelper();
+  final AppDatabase _database = AppDatabase();
 
   @override
   void initState() {
@@ -45,13 +44,13 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
         password: _passwordController.text,
       );
 
-      await _databaseHelper.updateUser(updatedUser.toMap());
+      await _database.updateUser(updatedUser);
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Account updated successfully')),
         );
-        Navigator.pop(context);
+        context.pop();
       }
     }
   }
@@ -79,12 +78,9 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   }
 
   void _deleteAccount() async {
-    await _databaseHelper.deleteUser();
+    await _database.deleteAllUsers();
     if (mounted) {
-      Navigator.of(context).pushAndRemoveUntil(
-        MaterialPageRoute(builder: (context) => const RegistrationScreen()),
-        (route) => false,
-      );
+      context.go('/register');
     }
   }
 
@@ -113,14 +109,11 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
 
     if (confirm == true && mounted) {
       // Delete current user data
-      await _databaseHelper.deleteUser();
+      await _database.deleteAllUsers();
 
       // Navigate to registration screen
       if (mounted) {
-        Navigator.of(context).pushAndRemoveUntil(
-          MaterialPageRoute(builder: (context) => const RegistrationScreen()),
-          (route) => false,
-        );
+        context.go('/register');
       }
     }
   }

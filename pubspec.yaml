@@ -34,8 +34,21 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.8
-  sqflite: ^2.3.2
+  
+  # Navigation
+  go_router: ^14.2.7
+  
+  # Database
+  drift: ^2.18.0
+  sqlite3_flutter_libs: ^0.5.0
   path_provider: ^2.1.2
+  path: ^1.9.0
+  
+  # Notifications
+  flutter_local_notifications: ^17.2.2
+  timezone: ^0.9.4
+  
+  # Utilities
   intl: ^0.19.0
 
 dev_dependencies:
@@ -48,6 +61,10 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  
+  # Drift code generation
+  drift_dev: ^2.18.0
+  build_runner: ^2.4.13
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
