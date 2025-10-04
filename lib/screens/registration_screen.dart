@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:drift/drift.dart' as drift;
 import '../data/database.dart';
+import '../services/database_service.dart';
 
 class RegistrationScreen extends StatefulWidget {
   const RegistrationScreen({super.key});
@@ -16,7 +17,13 @@ class _RegistrationScreenState extends State<RegistrationScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
-  final AppDatabase _database = AppDatabase();
+  late final AppDatabase _database;
+
+  @override
+  void initState() {
+    super.initState();
+    _database = DatabaseService().database;
+  }
 
   @override
   void dispose() {

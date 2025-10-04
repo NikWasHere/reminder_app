@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/data/latest.dart' as tz;
 import 'package:timezone/timezone.dart' as tz;
@@ -11,21 +12,31 @@ class NotificationService {
   final FlutterLocalNotificationsPlugin _flutterLocalNotificationsPlugin =
       FlutterLocalNotificationsPlugin();
 
+  bool _isInitialized = false;
+
   Future<void> initialize() async {
-    tz.initializeTimeZones();
+    if (_isInitialized) return;
 
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
+    try {
+      tz.initializeTimeZones();
 
-    const InitializationSettings initializationSettings =
-        InitializationSettings(android: initializationSettingsAndroid);
+      const AndroidInitializationSettings initializationSettingsAndroid =
+          AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    await _flutterLocalNotificationsPlugin.initialize(
-      initializationSettings,
-      onDidReceiveNotificationResponse: _onNotificationTap,
-    );
+      const InitializationSettings initializationSettings =
+          InitializationSettings(android: initializationSettingsAndroid);
 
-    await _requestPermissions();
+      await _flutterLocalNotificationsPlugin.initialize(
+        initializationSettings,
+        onDidReceiveNotificationResponse: _onNotificationTap,
+      );
+
+      await _requestPermissions();
+      _isInitialized = true;
+    } catch (e) {
+      // If notification initialization fails, continue without notifications
+      debugPrint('Notification initialization failed: $e');
+    }
   }
 
   Future<void> _requestPermissions() async {
@@ -49,31 +60,38 @@ class NotificationService {
     required String day,
     required String startTime,
   }) async {
-    final scheduledTime = _getNextClassTime(day, startTime);
-    if (scheduledTime == null) return;
+    if (!_isInitialized) return;
 
-    // Schedule 15 minutes before class
-    final reminderTime = scheduledTime.subtract(const Duration(minutes: 15));
+    try {
+      final scheduledTime = _getNextClassTime(day, startTime);
+      if (scheduledTime == null) return;
 
-    await _flutterLocalNotificationsPlugin.zonedSchedule(
-      id,
-      'Class Reminder',
-      '$courseName with $lecturer in $room starts in 15 minutes',
-      tz.TZDateTime.from(reminderTime, tz.local),
-      const NotificationDetails(
-        android: AndroidNotificationDetails(
-          'class_reminders',
-          'Class Reminders',
-          channelDescription: 'Notifications for upcoming classes',
-          importance: Importance.max,
-          priority: Priority.high,
+      // Schedule 15 minutes before class
+      final reminderTime = scheduledTime.subtract(const Duration(minutes: 15));
+
+      await _flutterLocalNotificationsPlugin.zonedSchedule(
+        id,
+        'Class Reminder',
+        '$courseName with $lecturer in $room starts in 15 minutes',
+        tz.TZDateTime.from(reminderTime, tz.local),
+        const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'class_reminders',
+            'Class Reminders',
+            channelDescription: 'Notifications for upcoming classes',
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
         ),
-      ),
-      androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-      uiLocalNotificationDateInterpretation:
-          UILocalNotificationDateInterpretation.absoluteTime,
-      matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
-    );
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        uiLocalNotificationDateInterpretation:
+            UILocalNotificationDateInterpretation.absoluteTime,
+        matchDateTimeComponents: DateTimeComponents.dayOfWeekAndTime,
+      );
+    } catch (e) {
+      debugPrint('Failed to schedule class reminder: $e');
+      // Continue without notifications - don't throw error
+    }
   }
 
   // Schedule assignment deadline reminders (H-1 and H-0)
@@ -83,50 +101,56 @@ class NotificationService {
     required String description,
     required DateTime dueDate,
   }) async {
-    // H-1 (24 hours before)
-    final dayBefore = dueDate.subtract(const Duration(days: 1));
-    if (dayBefore.isAfter(DateTime.now())) {
-      await _flutterLocalNotificationsPlugin.zonedSchedule(
-        assignmentId * 100, // Unique ID for H-1
-        'Assignment Due Tomorrow',
-        '$description ($courseName) deadline tomorrow at ${DateFormat('HH:mm').format(dueDate)}',
-        tz.TZDateTime.from(dayBefore, tz.local),
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'assignment_reminders',
-            'Assignment Reminders',
-            channelDescription: 'Notifications for assignment deadlines',
-            importance: Importance.max,
-            priority: Priority.high,
-          ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-      );
-    }
+    if (!_isInitialized) return;
 
-    // H-0 (on the day, 2 hours before)
-    final dayOf = dueDate.subtract(const Duration(hours: 2));
-    if (dayOf.isAfter(DateTime.now())) {
-      await _flutterLocalNotificationsPlugin.zonedSchedule(
-        assignmentId * 100 + 1, // Unique ID for H-0
-        'Assignment Due Today',
-        '$description ($courseName) deadline today at ${DateFormat('HH:mm').format(dueDate)}',
-        tz.TZDateTime.from(dayOf, tz.local),
-        const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'assignment_reminders',
-            'Assignment Reminders',
-            channelDescription: 'Notifications for assignment deadlines',
-            importance: Importance.max,
-            priority: Priority.high,
+    try {
+      // H-1 (24 hours before)
+      final dayBefore = dueDate.subtract(const Duration(days: 1));
+      if (dayBefore.isAfter(DateTime.now())) {
+        await _flutterLocalNotificationsPlugin.zonedSchedule(
+          assignmentId * 100, // Unique ID for H-1
+          'Assignment Due Tomorrow',
+          '$description ($courseName) deadline tomorrow at ${DateFormat('HH:mm').format(dueDate)}',
+          tz.TZDateTime.from(dayBefore, tz.local),
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'assignment_reminders',
+              'Assignment Reminders',
+              channelDescription: 'Notifications for assignment deadlines',
+              importance: Importance.max,
+              priority: Priority.high,
+            ),
           ),
-        ),
-        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
-        uiLocalNotificationDateInterpretation:
-            UILocalNotificationDateInterpretation.absoluteTime,
-      );
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+      }
+
+      // H-0 (on the day, 2 hours before)
+      final dayOf = dueDate.subtract(const Duration(hours: 2));
+      if (dayOf.isAfter(DateTime.now())) {
+        await _flutterLocalNotificationsPlugin.zonedSchedule(
+          assignmentId * 100 + 1, // Unique ID for H-0
+          'Assignment Due Today',
+          '$description ($courseName) deadline today at ${DateFormat('HH:mm').format(dueDate)}',
+          tz.TZDateTime.from(dayOf, tz.local),
+          const NotificationDetails(
+            android: AndroidNotificationDetails(
+              'assignment_reminders',
+              'Assignment Reminders',
+              channelDescription: 'Notifications for assignment deadlines',
+              importance: Importance.max,
+              priority: Priority.high,
+            ),
+          ),
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+          uiLocalNotificationDateInterpretation:
+              UILocalNotificationDateInterpretation.absoluteTime,
+        );
+      }
+    } catch (e) {
+      debugPrint('Failed to schedule assignment reminders: $e');
     }
   }
 

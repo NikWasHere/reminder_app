@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../data/database.dart';
 import '../services/notification_service.dart';
+import '../services/database_service.dart';
 
 class EditScheduleScreen extends StatefulWidget {
   final int scheduleId;
@@ -34,12 +35,13 @@ class _EditScheduleScreenState extends State<EditScheduleScreen> {
     'Sunday',
   ];
 
-  final AppDatabase _database = AppDatabase();
+  late final AppDatabase _database;
   final NotificationService _notificationService = NotificationService();
 
   @override
   void initState() {
     super.initState();
+    _database = DatabaseService().database;
     _loadSchedule();
   }
 

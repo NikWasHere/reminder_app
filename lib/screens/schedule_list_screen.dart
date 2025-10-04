@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../data/database.dart';
 import '../services/notification_service.dart';
+import '../services/database_service.dart';
 
 class ScheduleListScreen extends StatefulWidget {
   const ScheduleListScreen({super.key});
@@ -11,8 +12,15 @@ class ScheduleListScreen extends StatefulWidget {
 }
 
 class _ScheduleListScreenState extends State<ScheduleListScreen> {
-  final AppDatabase _database = AppDatabase();
+  late final AppDatabase _database;
   final NotificationService _notificationService = NotificationService();
+
+  @override
+  void initState() {
+    super.initState();
+    _database = DatabaseService().database;
+  }
+
   String _selectedDay = 'Monday';
   final List<String> _days = [
     'Monday',
@@ -53,9 +61,33 @@ class _ScheduleListScreenState extends State<ScheduleListScreen> {
                 return const Center(child: CircularProgressIndicator());
               }
 
+              if (snapshot.hasError) {
+                return Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.error, size: 64, color: Colors.red),
+                      const SizedBox(height: 16),
+                      Text('Error: ${snapshot.error}'),
+                      ElevatedButton(
+                        onPressed: () => setState(() {}),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+
               if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return Center(
-                  child: Text('No classes scheduled for $_selectedDay'),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.schedule, size: 64, color: Colors.grey),
+                      const SizedBox(height: 16),
+                      Text('No classes scheduled for $_selectedDay'),
+                    ],
+                  ),
                 );
               }
 

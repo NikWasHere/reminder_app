@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:drift/drift.dart' as drift;
 import '../data/database.dart';
 import '../services/notification_service.dart';
+import '../services/database_service.dart';
 
 class AddAssignmentScreen extends StatefulWidget {
   const AddAssignmentScreen({super.key});
@@ -20,14 +21,47 @@ class _AddAssignmentScreenState extends State<AddAssignmentScreen> {
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = const TimeOfDay(hour: 23, minute: 59);
 
-  final AppDatabase _database = AppDatabase();
+  late final AppDatabase _database;
   final NotificationService _notificationService = NotificationService();
+
+  @override
+  void initState() {
+    super.initState();
+    _database = DatabaseService().database;
+  }
 
   @override
   void dispose() {
     _courseNameController.dispose();
     _descriptionController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handleDatabaseError() async {
+    try {
+      // Reset database and try again
+      await DatabaseService().resetDatabase();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Database reset. Please try adding assignment again.',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Database error: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _selectDate() async {
@@ -60,36 +94,56 @@ class _AddAssignmentScreenState extends State<AddAssignmentScreen> {
 
   Future<void> _saveAssignment() async {
     if (_formKey.currentState!.validate()) {
-      final dueDate = DateTime(
-        _selectedDate.year,
-        _selectedDate.month,
-        _selectedDate.day,
-        _selectedTime.hour,
-        _selectedTime.minute,
-      );
-
-      final assignment = AssignmentsCompanion(
-        courseName: drift.Value(_courseNameController.text),
-        description: drift.Value(_descriptionController.text),
-        dueDate: drift.Value(dueDate),
-        isCompleted: const drift.Value(false),
-      );
-
-      final assignmentId = await _database.insertAssignment(assignment);
-
-      // Schedule notifications
-      await _notificationService.scheduleAssignmentReminders(
-        assignmentId: assignmentId,
-        courseName: _courseNameController.text,
-        description: _descriptionController.text,
-        dueDate: dueDate,
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Assignment added successfully')),
+      try {
+        final dueDate = DateTime(
+          _selectedDate.year,
+          _selectedDate.month,
+          _selectedDate.day,
+          _selectedTime.hour,
+          _selectedTime.minute,
         );
-        context.pop();
+
+        final assignment = AssignmentsCompanion(
+          courseName: drift.Value(_courseNameController.text.trim()),
+          description: drift.Value(_descriptionController.text.trim()),
+          dueDate: drift.Value(dueDate),
+          isCompleted: const drift.Value(false),
+        );
+
+        final assignmentId = await _database.insertAssignment(assignment);
+
+        // Schedule notifications (with try-catch to prevent notification issues from blocking)
+        try {
+          await _notificationService.scheduleAssignmentReminders(
+            assignmentId: assignmentId,
+            courseName: _courseNameController.text.trim(),
+            description: _descriptionController.text.trim(),
+            dueDate: dueDate,
+          );
+        } catch (e) {
+          debugPrint('Failed to schedule notifications: $e');
+        }
+
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Assignment added successfully')),
+          );
+          context.pop();
+        }
+      } catch (e) {
+        // If it's a SQL error about missing table, try to reset database
+        if (e.toString().contains('no such table: assignments')) {
+          await _handleDatabaseError();
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Failed to add assignment: $e'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
       }
     }
   }

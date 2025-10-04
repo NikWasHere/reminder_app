@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../data/database.dart';
+import '../services/database_service.dart';
 
 class AccountSettingsScreen extends StatefulWidget {
   final User user;
@@ -17,11 +18,12 @@ class _AccountSettingsScreenState extends State<AccountSettingsScreen> {
   late TextEditingController _emailController;
   late TextEditingController _passwordController;
 
-  final AppDatabase _database = AppDatabase();
+  late final AppDatabase _database;
 
   @override
   void initState() {
     super.initState();
+    _database = DatabaseService().database;
     _nameController = TextEditingController(text: widget.user.name);
     _emailController = TextEditingController(text: widget.user.email ?? '');
     _passwordController = TextEditingController(text: widget.user.password);

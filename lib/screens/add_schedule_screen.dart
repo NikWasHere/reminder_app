@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:drift/drift.dart' as drift;
 import '../data/database.dart';
 import '../services/notification_service.dart';
+import '../services/database_service.dart';
 
 class AddScheduleScreen extends StatefulWidget {
   const AddScheduleScreen({super.key});
@@ -30,8 +31,14 @@ class _AddScheduleScreenState extends State<AddScheduleScreen> {
     'Sunday',
   ];
 
-  final AppDatabase _database = AppDatabase();
+  late final AppDatabase _database;
   final NotificationService _notificationService = NotificationService();
+
+  @override
+  void initState() {
+    super.initState();
+    _database = DatabaseService().database;
+  }
 
   Future<void> _selectTime(BuildContext context, bool isStartTime) async {
     final TimeOfDay? picked = await showTimePicker(

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../data/database.dart';
 import '../services/notification_service.dart';
+import '../services/database_service.dart';
 
 class AssignmentListScreen extends StatefulWidget {
   const AssignmentListScreen({super.key});
@@ -12,8 +13,43 @@ class AssignmentListScreen extends StatefulWidget {
 }
 
 class _AssignmentListScreenState extends State<AssignmentListScreen> {
-  final AppDatabase _database = AppDatabase();
+  late final AppDatabase _database;
   final NotificationService _notificationService = NotificationService();
+
+  @override
+  void initState() {
+    super.initState();
+    _database = DatabaseService().database;
+  }
+
+  Future<void> _handleDatabaseReset() async {
+    try {
+      await DatabaseService().resetDatabase();
+      // Force recreate database instance
+      _database = DatabaseService().database;
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Database reset successfully. Please restart the app.',
+            ),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        setState(() {});
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Reset failed: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,8 +62,53 @@ class _AssignmentListScreenState extends State<AssignmentListScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
+          if (snapshot.hasError) {
+            final error = snapshot.error.toString();
+            return Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error, size: 64, color: Colors.red),
+                  const SizedBox(height: 16),
+                  Text('Database Error'),
+                  const SizedBox(height: 8),
+                  if (error.contains('no such table: assignments'))
+                    const Text(
+                      'Database schema issue detected.\nApp will reset database automatically.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () async {
+                      if (error.contains('no such table: assignments')) {
+                        await _handleDatabaseReset();
+                      } else {
+                        setState(() {});
+                      }
+                    },
+                    child: Text(
+                      error.contains('no such table: assignments')
+                          ? 'Reset Database'
+                          : 'Retry',
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }
+
           if (!snapshot.hasData || snapshot.data!.isEmpty) {
-            return const Center(child: Text('No upcoming assignments'));
+            return const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.assignment, size: 64, color: Colors.grey),
+                  SizedBox(height: 16),
+                  Text('No upcoming assignments'),
+                ],
+              ),
+            );
           }
 
           final assignments = snapshot.data!;

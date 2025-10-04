@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'schedule_list_screen.dart';
 import 'assignment_list_screen.dart';
-import '../data/database.dart';
+import '../services/database_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -34,7 +34,7 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   void _openAccountSettings() async {
-    final database = AppDatabase();
+    final database = DatabaseService().database;
     final user = await database.getUser();
     if (user != null && mounted) {
       context.push('/home/account-settings', extra: user);

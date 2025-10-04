@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
+import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as p;
 
@@ -126,7 +127,30 @@ class AppDatabase extends _$AppDatabase {
 LazyDatabase _openConnection() {
   return LazyDatabase(() async {
     final dbFolder = await getApplicationDocumentsDirectory();
-    final file = File(p.join(dbFolder.path, 'reminder_app.db'));
+
+    // Force clean slate - delete ALL database files and recreate
+    final allDbFiles = [
+      'reminder_app.db',
+      'reminder_app_v1.db',
+      'reminder_app_v2.db',
+      'reminder_app_v3.db',
+    ];
+
+    for (final dbFileName in allDbFiles) {
+      final dbFile = File(p.join(dbFolder.path, dbFileName));
+      if (await dbFile.exists()) {
+        await dbFile.delete();
+        debugPrint('Deleted database file: $dbFileName');
+      }
+    }
+
+    // Use completely new database name with timestamp to ensure uniqueness
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final file = File(
+      p.join(dbFolder.path, 'reminder_app_fresh_$timestamp.db'),
+    );
+
+    debugPrint('Creating fresh database: ${file.path}');
     return NativeDatabase.createInBackground(file);
   });
 }

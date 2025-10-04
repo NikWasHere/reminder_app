@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../data/database.dart';
 import '../services/notification_service.dart';
+import '../services/database_service.dart';
 
 class EditAssignmentScreen extends StatefulWidget {
   final int assignmentId;
@@ -23,12 +24,13 @@ class _EditAssignmentScreenState extends State<EditAssignmentScreen> {
   bool _isLoading = true;
   Assignment? _assignment;
 
-  final AppDatabase _database = AppDatabase();
+  late final AppDatabase _database;
   final NotificationService _notificationService = NotificationService();
 
   @override
   void initState() {
     super.initState();
+    _database = DatabaseService().database;
     _loadAssignment();
   }
 

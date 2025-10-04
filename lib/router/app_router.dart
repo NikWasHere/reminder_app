@@ -9,6 +9,7 @@ import '../screens/assignment_list_screen.dart';
 import '../screens/add_assignment_screen.dart';
 import '../screens/edit_assignment_screen.dart';
 import '../screens/account_settings_screen.dart';
+import '../services/database_service.dart';
 import '../data/database.dart';
 
 final GoRouter appRouter = GoRouter(
@@ -93,7 +94,7 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _checkUserStatus() async {
-    final database = AppDatabase();
+    final database = DatabaseService().database;
     final hasUser = await database.hasUser();
 
     if (mounted) {
